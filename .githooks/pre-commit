@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Blocks commits whose staged changes contain secrets. This repo is public.
+# Needs gitleaks (free, MIT): winget install Gitleaks.Gitleaks | brew install gitleaks
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass (sparingly):     git commit --no-verify
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "[hook] gitleaks not installed - secrets scan SKIPPED (install it; this repo is public)" >&2
+  exit 0
+fi
+exec gitleaks git --staged --redact --no-banner
