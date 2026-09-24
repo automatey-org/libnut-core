@@ -47,6 +47,13 @@ export function dragMouse(x: number, y: number): void;
 export function scrollMouse(x: number, y: number): void;
 export function getMousePos(): Point;
 export function getScreenSize(): Size;
+
+export interface Display extends Rect {
+  primary: boolean;
+}
+
+/** Every attached display in virtual-desktop coordinates (secondary monitors may be negative). */
+export function getDisplays(): Display[];
 export function getWindows(): number[];
 export function getActiveWindow(): number;
 export function getWindowRect(handle: number): Rect;

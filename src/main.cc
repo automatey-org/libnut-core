@@ -8,6 +8,8 @@
 #include "screengrab.h"
 #include "window_manager.h"
 #include <iostream>
+#include <utility>
+#include <vector>
 
 int mouseDelay = 10;
 int keyboardDelay = 10;
@@ -784,6 +786,20 @@ Napi::Object _captureScreen(const Napi::CallbackInfo &info) {
         w = info[2].As<Napi::Number>().Int64Value();
         h = info[3].As<Napi::Number>().Int64Value();
 
+#if defined(_WIN32)
+        // The capture DC spans the whole virtual desktop, so validate against
+        // it (secondary monitors can sit at negative coordinates) instead of
+        // the primary display only.
+        {
+            int64_t vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            int64_t vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int64_t vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            int64_t vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            if (w <= 0 || h <= 0 || x < vx || y < vy || x + w > vx + vw || y + h > vy + vh) {
+                throw Napi::Error::New(env, "Error: capture region outside of the virtual desktop");
+            }
+        }
+#else
         if (!(x >= 0 && x <= displaySize.width)) {
             throw Napi::Error::New(env, "Error: x coordinate outside of display");
         }
@@ -796,6 +812,7 @@ Napi::Object _captureScreen(const Napi::CallbackInfo &info) {
         if (!((y + h) >= 0 && (y + h) <= displaySize.height)) {
             throw Napi::Error::New(env, "Error: Given height exceeds display dimensions");
         }
+#endif
     } else {
         //We're getting the full screen.
         x = 0;
@@ -828,6 +845,47 @@ Napi::Object _captureScreen(const Napi::CallbackInfo &info) {
     return obj;
 }
 
+#if defined(_WIN32)
+static BOOL CALLBACK EnumDisplaysProc(HMONITOR monitor, HDC, LPRECT rect, LPARAM data) {
+    auto *list = reinterpret_cast<std::vector<std::pair<RECT, bool>> *>(data);
+    MONITORINFO mi;
+    mi.cbSize = sizeof(mi);
+    bool primary = GetMonitorInfo(monitor, &mi) && (mi.dwFlags & MONITORINFOF_PRIMARY);
+    list->push_back({*rect, primary});
+    return TRUE;
+}
+#endif
+
+// Every attached display as {x, y, width, height, primary}, in virtual-desktop
+// coordinates (secondary monitors may have negative x/y). Where enumeration
+// is not implemented, returns just the main display.
+Napi::Array _getDisplays(const Napi::CallbackInfo &info) {
+    Napi::Env env = info.Env();
+    Napi::Array result = Napi::Array::New(env);
+
+    auto push = [&](int64_t x, int64_t y, int64_t w, int64_t h, bool primary) {
+        Napi::Object d = Napi::Object::New(env);
+        d.Set("x", Napi::Number::New(env, (double) x));
+        d.Set("y", Napi::Number::New(env, (double) y));
+        d.Set("width", Napi::Number::New(env, (double) w));
+        d.Set("height", Napi::Number::New(env, (double) h));
+        d.Set("primary", Napi::Boolean::New(env, primary));
+        result.Set(result.Length(), d);
+    };
+
+#if defined(_WIN32)
+    std::vector<std::pair<RECT, bool>> displays;
+    EnumDisplayMonitors(NULL, NULL, EnumDisplaysProc, reinterpret_cast<LPARAM>(&displays));
+    for (const auto &d : displays) {
+        push(d.first.left, d.first.top, d.first.right - d.first.left, d.first.bottom - d.first.top, d.second);
+    }
+#else
+    MMSize main = getMainDisplaySize();
+    push(0, 0, main.width, main.height, true);
+#endif
+    return result;
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "dragMouse"), Napi::Function::New(env, _dragMouse));
     exports.Set(Napi::String::New(env, "moveMouse"), Napi::Function::New(env, _moveMouse));
@@ -844,6 +902,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set(Napi::String::New(env, "setKeyboardDelay"), Napi::Function::New(env, _setKeyboardDelay));
 
     exports.Set(Napi::String::New(env, "getScreenSize"), Napi::Function::New(env, _getScreenSize));
+    exports.Set(Napi::String::New(env, "getDisplays"), Napi::Function::New(env, _getDisplays));
     exports.Set(Napi::String::New(env, "highlight"), Napi::Function::New(env, _highlight));
     exports.Set(Napi::String::New(env, "getWindows"), Napi::Function::New(env, _getWindows));
     exports.Set(Napi::String::New(env, "getActiveWindow"), Napi::Function::New(env, _getActiveWindow));
