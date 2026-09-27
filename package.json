@@ -1,6 +1,9 @@
 {
-  "name": "@automatey/libnut-win32",
+  "name": "@automatey-org/libnut-win32",
   "version": "2.7.1",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "libnut is an N-API module for desktop automation with node",
   "main": "index.js",
   "typings": "index.d.ts",
@@ -13,13 +16,17 @@
     "publish:next": "npm publish --tag next"
   },
   "homepage": "https://nutjs.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/automatey-org/libnut-core.git"
+  },
   "author": {
     "name": "dry Software UG (haftungsbeschränkt)",
     "email": "info@dry.software",
     "url": "https://dry.software"
   },
   "bugs": {
-    "url": "https://github.com/nut-tree/nut.js/issues"
+    "url": "https://github.com/automatey-org/libnut-core/issues"
   },
   "keywords": [
     "GUI",
