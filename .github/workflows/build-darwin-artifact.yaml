@@ -1,0 +1,34 @@
+name: Build Darwin native artifact
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-darwin:
+    runs-on: macos-14
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Darwin native addon
+        run: |
+          npm run patch
+          npm run build:release
+
+      - name: Upload native binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: libnut-darwin-${{ github.sha }}
+          path: build/Release/libnut.node
+          if-no-files-found: error
